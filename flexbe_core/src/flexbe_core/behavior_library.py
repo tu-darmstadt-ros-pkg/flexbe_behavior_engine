@@ -125,7 +125,10 @@ class BehaviorLibrary(object):
             # rely on get_behavior to handle/log missing package
             return None
         try:
-            module_path = __import__(be_entry["package"]).__path__[-1]
+            rospack_path = os.path.join(self._rp.get_path(be_entry["package"]), "src", be_entry["package"])
+            temp = __import__(be_entry["package"]).__path__
+            path_index = next((i for i, x in enumerate(temp) if (rospack_path in x)), -1)
+            module_path = temp[path_index]
         except ImportError:
             Logger.logwarn("Cannot import behavior package '%s', using 'rospack find' instead" % be_entry["package"])
             # rp can find it because otherwise, the above entry would not exist
