@@ -121,6 +121,7 @@ class BehaviorActionServer(object):
 		if not self._behavior_started:
 			return
 		self._preempt_pub.publish()
+		self._as.set_preempted()
 		rospy.loginfo('Behavior execution preempt requested!')
 
 
@@ -147,8 +148,11 @@ class BehaviorActionServer(object):
 			return
 		elif msg.code == BEStatus.FINISHED:
 			result = msg.args[0] if len(msg.args) >= 1 else ''
-			rospy.loginfo('Finished behavior execution with result "%s"!' % result)
-			self._as.set_succeeded(BehaviorExecutionResult(outcome=result))
+			if "failed" in result.lower():
+				self._as.set_aborted('')
+			else:
+				rospy.logwarn('Finished behavior execution with result "%s"!' % result)
+				self._as.set_succeeded(BehaviorExecutionResult(outcome=result))
 			# Call goal cb in case there is a queued goal available
 			self._goal_cb()
 		elif msg.code == BEStatus.FAILED:
