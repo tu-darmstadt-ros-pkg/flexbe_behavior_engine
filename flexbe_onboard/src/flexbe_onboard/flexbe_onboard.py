@@ -91,8 +91,9 @@ class FlexbeOnboard(object):
                 self._pub.publish(self.feedback_topic, CommandFeedback(command="switch", args=['start']))
                 # ensure that switching is possible
                 if not self._is_switchable(be):
-                    Logger.logerr('Dropped behavior start request because switching is not possible.')
+                    Logger.logerr('Dropped behavior start request because switching is not possible...')
                     self._pub.publish(self.feedback_topic, CommandFeedback(command="switch", args=['not_switchable']))
+                    self._pub.publish(self.status_topic, BEStatus(behavior_id=msg.behavior_checksum, code=BEStatus.ERROR))
                     return
                 # wait if running behavior is currently starting or stopping
                 rate = rospy.Rate(100)
@@ -280,7 +281,7 @@ class FlexbeOnboard(object):
 
     def _is_switchable(self, be):
         if self.be.name != be.name:
-            Logger.logerr('Unable to switch behavior, names do not match:\ncurrent: %s <--> new: %s' %
+            Logger.logerr('Unable to switch behavior, names do not match: \n current: %s <--> new: %s' %
                           (self.be.name, be.name))
             return False
         # locked inside
