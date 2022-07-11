@@ -31,17 +31,26 @@ class BehaviorActionServer(object):
 		self._as = actionlib.SimpleActionServer('flexbe/execute_behavior', BehaviorExecutionAction, None, False)
 		self._as.register_preempt_callback(self._preempt_cb)
 		self._as.register_goal_callback(self._goal_cb)
-
 		self._rp = RosPack()
 		self._behavior_lib = BehaviorLibrary()
 
 		# start action server after all member variables have been initialized
 		self._as.start()
+		self._successful_preempted_running_behavior = False
 
 		rospy.loginfo("%d behaviors available, ready for start request." % self._behavior_lib.count_behaviors())
 
 
 	def _goal_cb(self):
+		if self._behavior_started:
+			# stop running behavior then start new one 
+			self._preempt_pub.publish()
+			rospy.logerr("Stopping running behavior before starting new behavior!")
+			self._successful_preempted_running_behavior = False
+			i = 0
+			while not self._successful_preempted_running_behavior and i<30:
+				rospy.sleep(0.1)# wait until previous behavior is stopped
+				i += 1
 		if self._as.is_active() or not self._as.is_new_goal_available():
 			return
 		goal = self._as.accept_new_goal()
@@ -147,15 +156,19 @@ class BehaviorActionServer(object):
 			rospy.logwarn('Ignored status because behavior id differed ({} vs {})!'.format(msg.behavior_id, self._active_behavior_id))
 			return
 		elif msg.code == BEStatus.FINISHED:
+			self._behavior_started = False
 			result = msg.args[0] if len(msg.args) >= 1 else ''
 			if "failed" in result.lower():
 				self._as.set_aborted('')
 			else:
 				rospy.logwarn('Finished behavior execution with result "%s"!' % result)
+				if result =="preempted":
+					self._successful_preempted_running_behavior = True
 				self._as.set_succeeded(BehaviorExecutionResult(outcome=result))
 			# Call goal cb in case there is a queued goal available
 			self._goal_cb()
 		elif msg.code == BEStatus.FAILED:
+			self._behavior_started = False
 			rospy.logerr('Behavior execution failed in state %s!' % str(self._current_state))
 			self._as.set_aborted('')
 			# Call goal cb in case there is a queued goal available
